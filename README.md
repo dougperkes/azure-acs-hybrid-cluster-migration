@@ -23,6 +23,12 @@ The key goals of this guide are as follows
 - [ ] Deploy Windows containers to an ACS Kubernetes cluster.
 - [ ] Create and secure a Linux NGINX ingress controller.
 - [ ] Route traffic from multiple customers to the correct applications. 
+- [ ] Allow each customer-specific application to be upgraded independently or in bulk.
+
+## Our goal, illustrated
+
+![](img/overviewdiagram.png)
+
 
 ## Reference Application
 
@@ -63,6 +69,71 @@ public class Env
 
 }
 ```    
+Using these configuration settings, our app will end up looking like the following, the yellow box representing the settings coming from the Environment and the red is the version of the current assembly for the app.
+
+![](img/SampleAppScreenShot.png)
+
+# Building a hybrid ACS cluster
+
+## Prerequisites
+
+Before we start building the cluster, we need a few prerequisites to be installed.
+
+1. Azure subscription. See [Experiment with Azure for FREE!](https://blogs.msdn.microsoft.com/dotnet/2017/10/19/experiment-with-azure-for-free/) if you don't already have one.
+1. [Windows 10 bash shell](https://msdn.microsoft.com/en-us/commandline/wsl/about) or equivalent Unix shell (OSX, Ubuntu, etc). 
+1. [Azure CLI 2.0 ](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
+1. If you want to use a real, valid SSL certificate, you'll need to obtain a wildcard cert. We will use a self-signed certificate for demo purposes.
+
+## Create the ACS cluster
+
+We will be using a resource manager template that I've borrow and modifed from [bucksteamy/kubernetes-demos](https://github.com/bucksteamy/kubernetes-demos/tree/master/acs-rps-win%2Blinuxpools%2Bmanagedisks). This template, in the [arm](arm) directory, will create a hybrid Windows + Linux cluster in ACS using the Kubernetes orchestrator.
+
+> The following commands will all be run in your bash shell.
+
+First we need to find our Azure  subscription id
+```bash
+az login
+```
+The results of this command will be a list of the subscriptions you have access to. Find the `id` of the subscription you want to use replace `mySubscriptionID` with your value in the following commands.
+
+Before we can create an ACS cluster we need Service Principal which ACS will use to interact with the Azure API. See [Set up an Azure AD service principal for a Kubernetes cluster in Container Service](https://docs.microsoft.com/en-us/azure/container-service/kubernetes/container-service-kubernetes-service-principal) for more detail.
+
+```bash
+az account set --subscription "mySubscriptionID"
+
+az ad sp create-for-rbac --role="Contributor" --scopes="/subscriptions/mySubscriptionID"
+```
+
+The results of this command will be a json blob similar to the following:
+```json
+{
+  "appId": "[your app id here]",
+  "displayName": "azure-cli-2017-10-20-23-10-13",
+  "name": "http://azure-cli-2017-10-20-23-10-13",
+  "password": "[your password here]",
+  "tenant": "[your tenant here]"
+}
+```
+Record the appID and password for future use when we create the cluster.
+
+We now are ready to create the cluster. CD in your bash shell to the `arm` directory of this repository.
+
+> Note: If you are running on windows and you have cloned this repository to c:\dev\sample you can move to that directory in the Bash shell by running `cd /mnt/c/dev/sample/arm`.
+
+```bash
+GROUP="[your resource group name, i.e. my-cluster-group]"
+ACSNAME="[your acs cluster name, i.e. hybrid-cluster]"
+WINPASSWORD="[create a secure password for windows machines]"
+APPID="[app id for service principal created above]"
+APPPW="[app password for service principal created above]"
+MYSSHKEY="$(cat ~/.ssh/id_rsa.pub)"
+
+# Create the Azure Resource Group
+az group create --name $GROUP --location "westus2"
+
+# Create the ACS Cluster
+az group 
+```
 
 # Endnotes
 **<a name="footnote1">1</a>:** “Digital Transformation - Microsoft Enterprise.” *Microsoft Enterprise*, Microsoft Corporation, 20 Oct. 2017, enterprise.microsoft.com/en-us/digital-transformation/.

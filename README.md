@@ -71,7 +71,7 @@ public class Env
 ```    
 Using these configuration settings, our app will end up looking like the following, the yellow box representing the settings coming from the Environment and the red is the version of the current assembly for the app.
 
-![](img/SampleAppScreenShot.png)
+![](img/SampleAppScreenshot.png)
 
 # Building a hybrid ACS cluster
 
@@ -132,7 +132,8 @@ MYSSHKEY="$(cat ~/.ssh/id_rsa.pub)"
 az group create --name $GROUP --location "westus2"
 
 # Create the ACS Cluster
-az group 
+az group deployment create -g $GROUP --template-file deployment.json --parameters @params.kubernetes.json --parameters windowsAgentAdminPassword="$WINPASSWORD" servicePrincipalClientId="$APPID" servicePrincipalClientSecret="$APPPW" sshRSAPublicKey="$MYSSHKEY" masterDnsNamePrefix="$ACSNAME"
+
 ```
 
 # Endnotes

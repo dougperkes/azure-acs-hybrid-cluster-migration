@@ -133,7 +133,52 @@ az group create --name $GROUP --location "westus2"
 
 # Create the ACS Cluster
 az group deployment create -g $GROUP --template-file deployment.json --parameters @params.kubernetes.json --parameters windowsAgentAdminPassword="$WINPASSWORD" servicePrincipalClientId="$APPID" servicePrincipalClientSecret="$APPPW" sshRSAPublicKey="$MYSSHKEY" masterDnsNamePrefix="$ACSNAME"
+```
 
+Creation of the ACS cluster will take several minutes. When complete, run the following command to verify cluster creation and to view the name of the cluster:
+```bash
+az acs list --output table
+```
+
+With the name of the cluster you can now retrieve the credentials to connect to it with `kubectl`. First, let's make sure `kubectl` is installed and then grab the credentials:
+```bash
+az acs kubernetes install-cli
+
+# Get the credentials, see note below
+az acs kubernetes get-credentials --resource-group $GROUP --name [your ACS cluster name]
+```
+
+> Note: Depending on the version of the Azure CLI you have, you may receive an error when running the `get-credentials` command. If you run into this you can retrieve the credentials by doing the following.
+
+#### Alternative method for retrieving credentials
+
+You may also retrieve the credentials needed to connect to the cluster by running an `scp` command. First we need the URL of the cluster.
+
+```bash
+az acs list --query "[].masterProfile.fqdn | [0]"
+```
+
+Now with the URL we can retrieve the credentials:
+```bash
+scp azureuser@[ your cluster url here ]:.kube/config ~/.kube/config
+```
+
+## Get information about the ACS Kubernetes cluster
+With the credentials in place we can now use the `kubectl` command to connect to the Kubernetes cluster and retrieve information. Try the following commands to start exploring your cluster.
+
+```bash
+kubectl get nodes
+kubectl get services # On a new cluster this should return a single kubernetes service.
+kubectl get pods # Should return "No resources found"
+kubectl --help
+```
+
+# Cleaning up your cluster
+
+When you are done playing, you may want to delete your resource group containing your cluster.
+
+```bash
+az group delete -g $GROUP
 ```
 
 # Endnotes

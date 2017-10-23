@@ -173,6 +173,106 @@ kubectl get pods # Should return "No resources found"
 kubectl --help
 ```
 
+
+## Deploying Pods and Services to the cluster
+
+Now that you have a running cluster and are able to connect to it with `kubectl`, you can start creating pods and services. All of the sample files we will be using are found in the `k8s` directory of this repository.
+
+### Default HTTP Backend
+
+The first pod and service we are going to create is a default http backend. These will serve as default catch-all for any traffic that goes through our ingress controller that does not match any of the rules.
+
+For this step we will use a sample backend created by Google that returns a 404 Not Found error on the root path `/` and a 200 OK on the `/healthz` path.
+
+Take a few minutes to review the [k8s/default.yaml](k8s/default.yaml) file. This file creates two resources in the Kubernetes cluster. 
+
+1. First, a Deployment is created named `default-http-backend` containing 2 replicates of a pod. The pod consists of a single container created from the image `gcr.io/google_containers/defaultbackend:1.0`. Make special note of the `nodeSelector` property with the value `beta.kubernetes.io/os: linux`. This ensures that this pod is only deployed on Linux nodes within the cluster.
+1. Second, we create a service, also named `default-http-backend` which exposes port 80 on a cluster IP address. The service will forward traffic to port 8080 on the pods.
+
+Create the default backend by running the following:
+```bash
+kubectl apply -f default.yaml
+```
+
+Now run the following commands to explore what has been created:
+```bash
+kubectl get services
+kubectl get pods
+```
+
+### Ingress Service and Certificate
+
+For the purposes of this guide, we are going to secure our web sites with a self-signed wildcard certificate. For production purposes you will need to acquire a real wildcard certificate. We will also utilize the [xip.io](http://xip.io/) service so that we don't have to manage any DNS entries.
+
+xip.io requires us to have an public IP address which we will get by created a LoadBalancer service in Kubernetes.
+
+Review the `ingress-service.yaml`, then run the following to create the service without any backing pods. We will create the pods via a deployment once we have our TLS certificate:
+```bash
+kubectl apply -f ingress-service.yaml
+```
+
+Now we need to wait for a public IP address to be defined. Run the following and wait until an EXTERNAL-IP address is assigned to the nginx-ingress-svc.
+```bash
+kubectl get services -w
+```
+The results will appear as follows:
+```
+NAME                   TYPE           CLUSTER-IP     EXTERNAL-IP   PORT(S)         AGE
+default-http-backend   ClusterIP      10.0.147.197   <none>        80/TCP          5m
+kubernetes             ClusterIP      10.0.0.1       <none>        443/TCP         24m
+nginx-ingress-svc      LoadBalancer   10.0.21.160    <pending>     443:32509/TCP   7s
+nginx-ingress-svc   LoadBalancer   10.0.21.160   52.191.175.92   443:32509/TCP   3m
+```
+
+#### Create a certificate and Kubernetes secret
+
+Now that the ingress service is running and a public IP address is available, we can create a self-signed wildcard cert for the xip.io domain.
+
+Run the following command. You will be prompted to provide some information about yourself. The most important value to provide is the `Common Name`. **You must input** the following: `*.[your EXTERNAL-IP].xip.io`.
+
+```bash
+openssl req -x509 -nodes -newkey rs4096 -keyout key.pem -out cert.pem -days 365
+```
+
+Here's my sample input that I used:
+```
+Country Name (2 letter code) [AU]:US
+State or Province Name (full name) [Some-State]:AZ
+Locality Name (eg, city) []:Peoria
+Organization Name (eg, company) [Internet Widgits Pty Ltd]:
+Organizational Unit Name (eg, section) []:
+Common Name (e.g. server FQDN or YOUR name) []:*.52.191.175.92.xip.io
+Email Address []:
+```
+
+You will now have a cert.pem and a key.pem file in your directory. We will now use these files to create a Kubernetes TLS secret named `xipio-tls-cert` which we will reference in our YAML files to secure access to our web services.
+
+Run the following:
+```bash
+kubectl create secret tls xipio-tls-cert --key key.pem --cert cert.pem
+```
+## Deploy the Ingress Controller Pods
+
+With a Kubernetes TLS secret in place, we can now deploy our NGINX Ingress controllor pods and test the default site. Examine the [k8s/ingress.yaml](k8s/ingress.yaml) file, noting the container image, args, and nodeSelector. This pod will only be deployed on Linux nodes in the cluster. Run the following:
+
+```bash
+kubectl apply -f ingress.yaml
+```
+
+Run `kubectl get pods` to ensure that your new nginx-ingress-controller-* pods are running.
+
+With the ingress controller pods running we should be able to test our initial setup. Open `https://www.[your EXTERNAL-IP].xip.io` in a web browser. You will get a big certificate warning because we are using a self-signed certificate which you need to bypass. In Chrome, click Advanced then the _Proceed to www.[your EXTERNAL-IP].xip.io (unsafe)_ link.
+
+If everything has gone according to plan, you will receive a page that looks like this:
+
+![](img/defaultBackend.png)
+
+Add `/healthz` to the URL and you will receive the following:
+
+![](img/defaultBackendHealthz.png)
+
+
+
 # Cleaning up your cluster
 
 When you are done playing, you may want to delete your resource group containing your cluster.

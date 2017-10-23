@@ -271,7 +271,79 @@ Add `/healthz` to the URL and you will receive the following:
 
 ![](img/defaultBackendHealthz.png)
 
+## Create the pods, service, and ingress rules for our customers.
 
+For our scenario we will be deploying apps for 3 different customers. For each of these customers we deploy the following Kubernetes resources. Explore the 3 app1-*.yaml files to discover what is going on. 
+
+1. **A deplyoment of app1** - the deployment creates 2 instances of the pods on the **Windows** cluster nodes. The spec for the containers specifies environment settings specific to each customer.
+2. **A service** - the ClusterIP service exposes the pods internally within the cluster.
+3. **Ingress rules** - the ingress rules are loaded by the NGINX Ingress controller we created earlier and tell NGXINX how to direct traffic to the service and which TLS certificate to use based on the host name of the incoming request.
+
+> **Important**: Open each of the app1-*.yaml files and update the hostnames on lines 61 and 64 to match your IP address. Save the files before continuing.
+
+Create these applications by running the following:
+
+```
+kubectl apply -f app1-adventureworks.yaml
+kubectl apply -f app1-contoso.yaml
+kubectl apply -f app1-woodgrovebank.yaml
+```
+
+These will take some time to create. The Windows image used for the applications, [dougperkes/mvcrandomanswergenerator](https://hub.docker.com/r/dougperkes/mvcrandomanswergenerator/tags/) is 6 GB in size so the image must be downloaded to the cluster so that it can be cached. Once the image is downloaded the containers will be spun up in the pod and Kubernetes will wait until it recevies an HTTP 200 response on the root path `/` as defined in the `readinessProbe` settings in the yaml file.
+
+You can monitor the deployment by running either `kubectl get pods` or `kubectl get deployments`. For example:
+```bash
+dougper@RLMFACEBOOK0571:/mnt/c/dev/dougper/azure-acs-hybrid-cluster-migration/k8s$ kubectl get deployments
+NAME                         DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+app1-adventureworks-deploy   2         2         2            2           3m
+app1-contoso-deploy          2         2         2            2           4m
+app1-woodgrovebank-deploy    2         2         2            2           11m
+default-http-backend         2         2         2            2           44m
+nginx-ingress-controller     2         2         2            2           59m
+```
+
+Browse to the applications using https and the hostnames specified in the yaml files, i.e. `https://contoso.[your EXTERNAL-IP].xip.io/`. 
+
+# Upgrading the image for your pods
+
+There a several different ways to update the application. Once changes are made to the image and pushed to a container registry, you can update the deployment with the new container image. Because we are using Kubernetes deployments, the updates happen using a rolling update method.
+
+### Option 1: Use kubectl to set a new image.
+
+```bash
+kubectl set image deployment/app1-adventureworks-deploy app1-adventureworks=dougperkes/mvcrandomanswergenerator:v2
+```
+
+Monitor the rollout of the new pods and termination of the previous version pods.
+
+```bash
+kubectl rollout status deployment/app1-adventureworks-deploy
+```
+
+### Option 2: Update the .yaml file and re-apply.
+
+Open the `app1-contoso.yaml` file and change the image to `dougperkes/mvcrandomanswergenerator:v2`. Save the file and run the following:
+
+```bash
+kubectl apply -f app1-contoso.yaml
+```
+
+Monitor the rollout of the new pods and termination of the previous version pods.
+
+```bash
+kubectl rollout status deployment/app1-contoso-deploy
+```
+
+This will give you the following:
+
+```
+Waiting for rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for rollout to finish: 1 out of 2 new replicas have been updated...
+Waiting for rollout to finish: 1 old replicas are pending termination...
+Waiting for rollout to finish: 1 old replicas are pending termination...
+deployment "app1-contoso-deploy" successfully rolled out
+```
 
 # Cleaning up your cluster
 

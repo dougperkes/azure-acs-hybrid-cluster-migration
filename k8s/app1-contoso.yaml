@@ -1,0 +1,70 @@
+apiVersion: apps/v1beta1 # for versions before 1.6.0 use extensions/v1beta1
+kind: Deployment
+metadata:
+  name: app1-contoso-deploy
+  labels:
+    zone: prod
+    version: v1
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: app1-contoso
+    spec:
+      containers:
+      - name: app1-contoso
+        image: dougperkes/mvcrandomanswergenerator:v2
+        ports:
+        - containerPort: 80
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+        env:
+        - name: CM_CUSTOMER_NAME
+          value: Contoso, LTD
+        - name: CM_LOGO_URL
+          value: https://armtemplatesdougper.blob.core.windows.net/public/logos/contoso.png
+        - name: CM_DATABASE_NAME
+          value: CONTOSO_DB_Name
+      nodeSelector:
+        beta.kubernetes.io/os: windows
+
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: app1-contoso-service
+  labels:
+    app: app1-contoso
+spec:
+  selector:
+    app: app1-contoso
+  ports:
+  - port: 80
+    protocol: TCP
+  type: ClusterIP
+  
+---
+
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+  name: app1-contoso-ingress
+spec:
+  tls:
+  - hosts:
+    - contoso.52.191.175.92.xip.io
+    secretName: xipio-tls-cert
+  rules:
+    - host: contoso.52.191.175.92.xip.io
+      http:
+        paths:
+          - path: /
+            backend:
+              serviceName: app1-contoso-service
+              servicePort: 80              

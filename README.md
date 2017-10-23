@@ -264,9 +264,11 @@ Run `kubectl get pods` to ensure that your new nginx-ingress-controller-* pods a
 With the ingress controller pods running we should be able to test our initial setup. Open `https://www.[your EXTERNAL-IP].xip.io` in a web browser. You will get a big certificate warning because we are using a self-signed certificate which you need to bypass. In Chrome, click Advanced then the _Proceed to www.[your EXTERNAL-IP].xip.io (unsafe)_ link.
 
 If everything has gone according to plan, you will receive a page that looks like this:
+
 ![](img/defaultBackend.png)
 
 Add `/healthz` to the URL and you will receive the following:
+
 ![](img/defaultBackendHealthz.png)
 
 
